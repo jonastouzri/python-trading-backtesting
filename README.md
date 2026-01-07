@@ -41,18 +41,18 @@ Explicitly **out of scope**:
 ---
 
 ## Project Structure
-python-trading-backtesting/
-├── backtesting/
-│   ├── engine.py        # Backtest loop (candle-by-candle execution)
-│   ├── portfolio.py     # Position, PnL & equity tracking
-│   └── metrics.py       # Performance and risk metrics
-├── strategies/
-│   └── sma_crossover.py # Example strategy (signal-only logic)
-├── data/
-│   └── sample_ohlc.csv  # Example OHLC data
-├── run_backtest.py      # Entry point
-├── requirements.txt
-└── README.
+python-trading-backtesting/  
+├── backtesting/  
+│   ├── engine.py        # Backtest loop (candle-by-candle execution)  
+│   ├── portfolio.py     # Position, PnL & equity tracking  
+│   └── metrics.py       # Performance and risk metrics  
+├── strategies/  
+│   └── sma_crossover.py # Example strategy (signal-only logic)  
+├── data/  
+│   └── sample_ohlc.csv  # Example OHLC data  
+├── run_backtest.py      # Entry point  
+├── requirements.txt  
+└── README.  
 
 ---
 
