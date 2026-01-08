@@ -8,10 +8,10 @@ from examples.sma_crossover import SMACrossoverStrategy
 
 def main():
     # CSV-Datei
-    csv_path = "data/XAUUSD.csv"
+    csv_path = "../data/XAUUSD_PERIOD_15.csv"
 
     # Daten laden
-    data = load_ohlc_csv(filepath=csv_path, time_format="%Y-%m-%d %H:%M:%S")
+    data = load_ohlc_csv(filepath=csv_path, time_format="%Y.%m.%d %H:%M:%S")
 
     # Portfolio initialisieren
     portfolio = Portfolio(initial_cash=10_000)
@@ -27,7 +27,7 @@ def main():
 
     # Plot
     plt.figure(figsize=(12, 6))
-    plt.plot([candle["time"] for candle in data], portfolio.equity_curve, label="Equity Curve")
+    plt.plot([candle["time"] for candle in data], portfolio.equity_curve[1:], label="Equity Curve")
     plt.xlabel("Time")
     plt.ylabel("Equity")
     plt.title("Portfolio Equity Curve")

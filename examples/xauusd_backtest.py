@@ -6,12 +6,12 @@ from examples.sma_crossover import SMACrossoverStrategy
 
 def main():
     # Path to your XAUUSD CSV file
-    csv_path = "data/XAUUSD.csv"
+    csv_path = "../data/XAUUSD_PERIOD_15.csv"
 
     # Load historical OHLC data
     data = load_ohlc_csv(
         filepath=csv_path,
-        time_format="%Y-%m-%d %H:%M:%S",  # adjust if needed
+        time_format="%Y.%m.%d %H:%M:%S",  # adjust if needed
     )
 
     # Initialize portfolio

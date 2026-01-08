@@ -6,31 +6,26 @@ from examples.sma_crossover import SMACrossoverStrategy
 
 
 def plot_dashboard(data, portfolio: Portfolio):
-    """
-    Plot:
-    - Equity Curve
-    - Buy/Sell positions
-    - Max Drawdown
-    """
-    times = [candle["time"] for candle in data]
-    equity = portfolio.equity_curve[1:]  # first value is initial cash
+    times = [c["time"] for c in data]
+    equity = portfolio.equity_curve[1:]
 
-    # Identify Buy/Sell points
     buy_times, buy_equity = [], []
     sell_times, sell_equity = [], []
-    for trade in portfolio.trades:
-        if trade.pnl >= 0:  # simplification: positive pnl as buy, negative as sell
-            buy_times.append(trade.entry_time)
-            buy_equity.append(trade.entry_price)
-        else:
-            sell_times.append(trade.exit_time)
-            sell_equity.append(trade.exit_price)
 
-    # Equity Curve Plot
+    for trade in portfolio.trades:
+        entry_idx = trade.get("entry_index")
+        exit_idx = trade.get("exit_index")
+
+        if entry_idx is not None:
+            buy_times.append(times[entry_idx])
+            buy_equity.append(equity[entry_idx])
+
+        if exit_idx is not None:
+            sell_times.append(times[exit_idx])
+            sell_equity.append(equity[exit_idx])
+
     plt.figure(figsize=(14, 7))
     plt.plot(times, equity, label="Equity Curve", color="blue")
-
-    # Buy/Sell signals
     plt.scatter(buy_times, buy_equity, marker="^", color="green", label="Buy")
     plt.scatter(sell_times, sell_equity, marker="v", color="red", label="Sell")
 
@@ -53,8 +48,8 @@ def plot_dashboard(data, portfolio: Portfolio):
 
 
 def main():
-    csv_path = "data/XAUUSD.csv"
-    data = load_ohlc_csv(filepath=csv_path, time_format="%Y-%m-%d %H:%M:%S")
+    csv_path = "../data/XAUUSD_PERIOD_15.csv"
+    data = load_ohlc_csv(filepath=csv_path, time_format="%Y.%m.%d %H:%M:%S")
 
     portfolio = Portfolio(initial_cash=10_000)
     strategy = SMACrossoverStrategy(short_window=20, long_window=50)

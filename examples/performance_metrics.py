@@ -17,7 +17,7 @@ def calculate_metrics(portfolio: Portfolio):
     total_return = (equity[-1] / equity[0]) - 1
 
     # Approximate CAGR assuming daily bars
-    num_days = len(equity)
+    num_days = len(equity) - 1  # exclude initial cash
     cagr = (equity[-1] / equity[0]) ** (252 / num_days) - 1  # 252 trading days/year
 
     # Max Drawdown
@@ -32,7 +32,7 @@ def calculate_metrics(portfolio: Portfolio):
 
     # Winrate: % profitable trades
     if portfolio.trades:
-        wins = sum(1 for t in portfolio.trades if t.pnl > 0)
+        wins = sum(1 for t in portfolio.trades if t.get("pnl", 0) > 0)
         winrate = wins / len(portfolio.trades)
     else:
         winrate = 0
@@ -47,9 +47,9 @@ def calculate_metrics(portfolio: Portfolio):
 
 
 def main():
-    csv_path = "data/XAUUSD.csv"
+    csv_path = "../data/XAUUSD_PERIOD_15.csv"
 
-    data = load_ohlc_csv(filepath=csv_path, time_format="%Y-%m-%d %H:%M:%S")
+    data = load_ohlc_csv(filepath=csv_path, time_format="%Y.%m.%d %H:%M:%S")
 
     portfolio = Portfolio(initial_cash=10_000)
     strategy = SMACrossoverStrategy(short_window=20, long_window=50)
@@ -58,6 +58,7 @@ def main():
     engine.run()
 
     metrics = calculate_metrics(portfolio)
+    print("\nPerformance Metrics:")
     for key, value in metrics.items():
         if isinstance(value, float):
             print(f"{key}: {value:.4f}")
