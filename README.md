@@ -64,6 +64,21 @@ The implementation prioritizes transparency and reproducibility over performance
 
 ---
 
+## Data
+
+Historical market data is not included in this repository.
+
+To run the examples, place your own CSV file in the `data/` directory
+with the following columns:
+
+- time
+- open
+- high
+- low
+- close
+
+---
+
 ## 🚧 Current Status
 
 This project is under active development.
