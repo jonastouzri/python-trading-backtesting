@@ -7,7 +7,9 @@ class BacktestEngine:
     def run(self):
         for i, candle in enumerate(self.data):
             price = candle["close"]
-            print((i/len(self.data)) * 100)
+            high = candle["high"]
+            low = candle["low"]
+
             # -------- Entry --------
             signal = self.strategy.generate_signal(i, self.data)
             if signal == "buy":
@@ -18,14 +20,24 @@ class BacktestEngine:
 
             # -------- Exit --------
             if self.portfolio.position_open:
-                # SL/TP Check
-                if price <= self.portfolio.sl:
-                    self.portfolio.close_position(price, i, exit_type="sl")
-                elif price >= self.portfolio.tp:
-                    self.portfolio.close_position(price, i, exit_type="tp")
+                exit_price = None
+                exit_type = None
+
+                # Intrabar SL/TP prüfen
+                if low <= self.portfolio.sl:
+                    exit_price = self.portfolio.sl
+                    exit_type = "sl"
+                elif high >= self.portfolio.tp:
+                    exit_price = self.portfolio.tp
+                    exit_type = "tp"
                 # Strategy Exit
                 elif signal == "sell":
-                    self.portfolio.close_position(price, i, exit_type="strategy")
+                    exit_price = price
+                    exit_type = "strategy"
+
+                if exit_price is not None:
+                    # Vertikale Linie auf Close der Kerze, nicht auf Eintrittspunkt der Bedingung
+                    self.portfolio.close_position(exit_price, i, exit_type=exit_type)
 
             # -------- Equity Update --------
             self.portfolio.update_equity()

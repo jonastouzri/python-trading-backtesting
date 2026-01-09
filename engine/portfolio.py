@@ -40,10 +40,11 @@ class Portfolio:
             "sl": self.sl,
             "tp": self.tp,
             "pnl": pnl,
-            "exit_type": exit_type,
+            "exit_type": exit_type,  # sehr wichtig für Linienfarbe
         }
         self.trades.append(trade)
 
+        # Position zurücksetzen
         self.position_open = False
         self.entry_price = None
         self.entry_index = None
