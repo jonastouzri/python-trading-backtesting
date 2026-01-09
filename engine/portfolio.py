@@ -6,19 +6,21 @@ class Portfolio:
         self.position_open = False
         self.entry_price = None
         self.entry_index = None
+        self.sl = None
+        self.tp = None
 
         self.trades = []
-
-        # Equity indexed by candle index
         self.equity_curve = [initial_cash]
 
-    def open_position(self, price: float, index: int):
+    def open_position(self, price: float, index: int, sl: float, tp: float):
         if self.position_open:
             return  # ignore signal
 
         self.position_open = True
         self.entry_price = price
         self.entry_index = index
+        self.sl = sl
+        self.tp = tp
 
     def close_position(self, price: float, index: int):
         if not self.position_open:
@@ -32,6 +34,8 @@ class Portfolio:
             "exit_index": index,
             "entry_price": self.entry_price,
             "exit_price": price,
+            "sl": self.sl,
+            "tp": self.tp,
             "pnl": pnl,
         }
         self.trades.append(trade)
@@ -39,10 +43,12 @@ class Portfolio:
         self.position_open = False
         self.entry_price = None
         self.entry_index = None
+        self.sl = None
+        self.tp = None
 
     def update_equity(self):
         """
         Call once per candle.
-        Equity only changes when cash changes (i.e. after trade close).
+        Equity changes only when a trade is closed.
         """
         self.equity_curve.append(self.cash)

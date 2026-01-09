@@ -7,7 +7,7 @@ from examples.sma_crossover import SMACrossoverStrategy
 
 
 def plot_trade_timeline(data, portfolio):
-    closes = [candle["close"] for candle in data]
+    closes = [c["close"] for c in data]
     x = list(range(len(closes)))
 
     fig, (ax_price, ax_equity) = plt.subplots(
@@ -16,16 +16,35 @@ def plot_trade_timeline(data, portfolio):
 
     # -------- Price Plot --------
     ax_price.plot(x, closes, label="Close Price")
-    ax_price.set_title("Price with Trade Entries / Exits")
+    ax_price.set_title("Price with Trades, SL & TP")
     ax_price.set_ylabel("Price")
 
     for trade in portfolio.trades:
-        ax_price.axvline(
-            trade["entry_index"], linestyle="--", alpha=0.4
-        )
-        ax_price.axvline(
-            trade["exit_index"], linestyle="-", alpha=0.4
-        )
+        entry_i = trade["entry_index"]
+        exit_i = trade["exit_index"]
+        pnl = trade["pnl"]
+
+        # Farbe Hintergrund je nach Gewinn/Verlust
+        bg_color = "green" if pnl > 0 else "red"
+
+        # Farbe für SL/TP Linie
+        if pnl > 0:
+            line_color = "green"  # Gewinner
+        elif pnl < 0:
+            line_color = "red"    # Verlust über SL/TP
+        else:
+            line_color = "grey"   # Strategy Exit ohne SL/TP
+
+        # Entry / Exit
+        ax_price.axvline(entry_i, linestyle="--", alpha=0.4)
+        ax_price.axvline(exit_i, linestyle="-", alpha=0.4)
+
+        # SL / TP Linie
+        ax_price.hlines(trade["sl"], entry_i, exit_i, linestyles="dotted", color=line_color, alpha=0.6)
+        ax_price.hlines(trade["tp"], entry_i, exit_i, linestyles="dotted", color=line_color, alpha=0.6)
+
+        # Trade Hintergrund
+        ax_price.axvspan(entry_i, exit_i, color=bg_color, alpha=0.1)
 
     ax_price.legend()
 
@@ -36,13 +55,24 @@ def plot_trade_timeline(data, portfolio):
         portfolio.equity_curve,
         where="post",
         label="Equity Curve",
+        color="blue",
     )
 
     ax_equity.set_title("Equity Curve (Realized PnL Only)")
     ax_equity.set_xlabel("Candle Index")
     ax_equity.set_ylabel("Equity")
-    ax_equity.legend()
 
+    # -------- Trade Stats --------
+    total_trades = len(portfolio.trades)
+    winners = sum(1 for t in portfolio.trades if t["pnl"] > 0)
+    win_rate = winners / total_trades * 100 if total_trades > 0 else 0
+    stats_text = f"Total Trades: {total_trades}\nWin Rate: {win_rate:.1f}%"
+    ax_equity.text(
+        0.02, 0.95, stats_text, transform=ax_equity.transAxes,
+        verticalalignment="top", bbox=dict(boxstyle="round", facecolor="white", alpha=0.8)
+    )
+
+    ax_equity.legend()
     plt.tight_layout()
     plt.show()
 

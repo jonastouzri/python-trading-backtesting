@@ -1,62 +1,81 @@
 import matplotlib.pyplot as plt
-from engine.portfolio import Portfolio
+
 from engine.engine import BacktestEngine
+from engine.portfolio import Portfolio
 from data.csv_loader import load_ohlc_csv
 from examples.sma_crossover import SMACrossoverStrategy
 
 
-def plot_dashboard(data, portfolio: Portfolio):
-    times = [c["time"] for c in data]
-    equity = portfolio.equity_curve[1:]
+def plot_trade_timeline(data, portfolio):
+    closes = [c["close"] for c in data]
+    x = list(range(len(closes)))
 
-    buy_times, buy_equity = [], []
-    sell_times, sell_equity = [], []
+    fig, (ax_price, ax_equity) = plt.subplots(
+        2, 1, figsize=(14, 8), sharex=True
+    )
+
+    # -------- Price Plot --------
+    ax_price.plot(x, closes, label="Close Price")
+    ax_price.set_title("Price with Trades, SL & TP")
+    ax_price.set_ylabel("Price")
 
     for trade in portfolio.trades:
-        entry_idx = trade.get("entry_index")
-        exit_idx = trade.get("exit_index")
+        entry_i = trade["entry_index"]
+        exit_i = trade["exit_index"]
 
-        if entry_idx is not None:
-            buy_times.append(times[entry_idx])
-            buy_equity.append(equity[entry_idx])
+        # Entry / Exit
+        ax_price.axvline(entry_i, linestyle="--", alpha=0.4)
+        ax_price.axvline(exit_i, linestyle="-", alpha=0.4)
 
-        if exit_idx is not None:
-            sell_times.append(times[exit_idx])
-            sell_equity.append(equity[exit_idx])
+        # SL / TP (only during trade)
+        ax_price.hlines(
+            trade["sl"],
+            entry_i,
+            exit_i,
+            linestyles="dotted",
+            alpha=0.6,
+        )
+        ax_price.hlines(
+            trade["tp"],
+            entry_i,
+            exit_i,
+            linestyles="dotted",
+            alpha=0.6,
+        )
 
-    plt.figure(figsize=(14, 7))
-    plt.plot(times, equity, label="Equity Curve", color="blue")
-    plt.scatter(buy_times, buy_equity, marker="^", color="green", label="Buy")
-    plt.scatter(sell_times, sell_equity, marker="v", color="red", label="Sell")
+    ax_price.legend()
 
-    # Max Drawdown
-    peak = equity[0]
-    max_dd = [0]
-    for value in equity:
-        if value > peak:
-            peak = value
-        max_dd.append(peak - value)
-    plt.fill_between(times, equity, [e - d for e, d in zip(equity, max_dd)], color="red", alpha=0.1, label="Drawdown")
+    # -------- Equity Plot --------
+    equity_x = list(range(len(portfolio.equity_curve)))
+    ax_equity.step(
+        equity_x,
+        portfolio.equity_curve,
+        where="post",
+        label="Equity Curve",
+    )
 
-    plt.xlabel("Time")
-    plt.ylabel("Equity / Price")
-    plt.title("Backtest Dashboard: Equity Curve, Trades & Drawdown")
-    plt.grid(True)
-    plt.legend()
+    ax_equity.set_title("Equity Curve (Realized PnL Only)")
+    ax_equity.set_xlabel("Candle Index")
+    ax_equity.set_ylabel("Equity")
+    ax_equity.legend()
+
     plt.tight_layout()
     plt.show()
 
 
 def main():
-    csv_path = "../data/XAUUSD_PERIOD_15_SHORT.csv"
-    data = load_ohlc_csv(filepath=csv_path, time_format="%Y.%m.%d %H:%M:%S")
+    data = load_ohlc_csv(
+        filepath="../data/XAUUSD_PERIOD_15_SHORT.csv",
+        time_format="%Y.%m.%d %H:%M:%S",
+    )
 
     portfolio = Portfolio(initial_cash=10_000)
     strategy = SMACrossoverStrategy(short_window=20, long_window=50)
-    engine = BacktestEngine(data=data, portfolio=portfolio, strategy=strategy)
+    engine = BacktestEngine(data, portfolio, strategy)
+
     engine.run()
 
-    plot_dashboard(data, portfolio)
+    plot_trade_timeline(data, portfolio)
 
 
 if __name__ == "__main__":
