@@ -22,7 +22,10 @@ class Portfolio:
         self.sl = sl
         self.tp = tp
 
-    def close_position(self, price: float, index: int):
+    def close_position(self, price: float, index: int, exit_type: str = "strategy"):
+        """
+        exit_type: "strategy" | "sl" | "tp"
+        """
         if not self.position_open:
             return
 
@@ -37,6 +40,7 @@ class Portfolio:
             "sl": self.sl,
             "tp": self.tp,
             "pnl": pnl,
+            "exit_type": exit_type,
         }
         self.trades.append(trade)
 
@@ -47,8 +51,5 @@ class Portfolio:
         self.tp = None
 
     def update_equity(self):
-        """
-        Call once per candle.
-        Equity changes only when a trade is closed.
-        """
+        """Call once per candle. Equity changes only when a trade is closed."""
         self.equity_curve.append(self.cash)

@@ -23,27 +23,28 @@ def plot_trade_timeline(data, portfolio):
         entry_i = trade["entry_index"]
         exit_i = trade["exit_index"]
         pnl = trade["pnl"]
+        exit_type = trade["exit_type"]
 
-        # Farbe Hintergrund je nach Gewinn/Verlust
+        # Trade Hintergrund grün/rot nach PnL
         bg_color = "green" if pnl > 0 else "red"
 
-        # Farbe für SL/TP Linie
-        if pnl > 0:
-            line_color = "green"  # Gewinner
-        elif pnl < 0:
-            line_color = "red"    # Verlust über SL/TP
-        else:
-            line_color = "grey"   # Strategy Exit ohne SL/TP
+        # SL/TP Linie nach Exit-Typ
+        if exit_type == "sl":
+            line_color = "red"
+        elif exit_type == "tp":
+            line_color = "green"
+        else:  # strategy exit
+            line_color = "grey"
 
-        # Entry / Exit
+        # Entry / Exit Linien
         ax_price.axvline(entry_i, linestyle="--", alpha=0.4)
         ax_price.axvline(exit_i, linestyle="-", alpha=0.4)
 
-        # SL / TP Linie
+        # SL / TP Linien
         ax_price.hlines(trade["sl"], entry_i, exit_i, linestyles="dotted", color=line_color, alpha=0.6)
         ax_price.hlines(trade["tp"], entry_i, exit_i, linestyles="dotted", color=line_color, alpha=0.6)
 
-        # Trade Hintergrund
+        # Trade Hintergrund transparent
         ax_price.axvspan(entry_i, exit_i, color=bg_color, alpha=0.1)
 
     ax_price.legend()
@@ -79,9 +80,11 @@ def plot_trade_timeline(data, portfolio):
 
 def main():
     data = load_ohlc_csv(
-        filepath="../data/XAUUSD_PERIOD_15_SHORT.csv",
+        filepath="../data/XAUUSD_PERIOD_15.csv",
         time_format="%Y.%m.%d %H:%M:%S",
     )
+
+    data = data[0:40_000]
 
     portfolio = Portfolio(initial_cash=10_000)
     strategy = SMACrossoverStrategy(short_window=20, long_window=50)

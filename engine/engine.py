@@ -7,7 +7,7 @@ class BacktestEngine:
     def run(self):
         for i, candle in enumerate(self.data):
             price = candle["close"]
-
+            print((i/len(self.data)) * 100)
             # -------- Entry --------
             signal = self.strategy.generate_signal(i, self.data)
             if signal == "buy":
@@ -19,12 +19,13 @@ class BacktestEngine:
             # -------- Exit --------
             if self.portfolio.position_open:
                 # SL/TP Check
-                if price <= self.portfolio.sl or price >= self.portfolio.tp:
-                    self.portfolio.close_position(price, i)
-
+                if price <= self.portfolio.sl:
+                    self.portfolio.close_position(price, i, exit_type="sl")
+                elif price >= self.portfolio.tp:
+                    self.portfolio.close_position(price, i, exit_type="tp")
                 # Strategy Exit
                 elif signal == "sell":
-                    self.portfolio.close_position(price, i)
+                    self.portfolio.close_position(price, i, exit_type="strategy")
 
             # -------- Equity Update --------
             self.portfolio.update_equity()
