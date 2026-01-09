@@ -1,20 +1,34 @@
 class SMACrossoverStrategy:
-    def __init__(self, short_window=20, long_window=50):
+    def __init__(self, short_window: int = 20, long_window: int = 50):
         self.short_window = short_window
         self.long_window = long_window
-        self.prices = []
 
-    def __call__(self, candle):
-        self.prices.append(candle["close"])
-        if len(self.prices) < self.long_window:
+    def generate_signal(self, index: int, data):
+        if index < self.long_window:
             return None
 
-        short_sma = sum(self.prices[-self.short_window:]) / self.short_window
-        long_sma = sum(self.prices[-self.long_window:]) / self.long_window
+        closes = [c["close"] for c in data]
 
-        if short_sma > long_sma:
+        short_sma_prev = sum(
+            closes[index - self.short_window - 1 : index - 1]
+        ) / self.short_window
+        long_sma_prev = sum(
+            closes[index - self.long_window - 1 : index - 1]
+        ) / self.long_window
+
+        short_sma_curr = sum(
+            closes[index - self.short_window : index]
+        ) / self.short_window
+        long_sma_curr = sum(
+            closes[index - self.long_window : index]
+        ) / self.long_window
+
+        # Bullish crossover
+        if short_sma_prev <= long_sma_prev and short_sma_curr > long_sma_curr:
             return "buy"
-        elif short_sma < long_sma:
+
+        # Bearish crossover
+        if short_sma_prev >= long_sma_prev and short_sma_curr < long_sma_curr:
             return "sell"
-        else:
-            return None
+
+        return None

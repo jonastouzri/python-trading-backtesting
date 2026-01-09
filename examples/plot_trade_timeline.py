@@ -49,8 +49,8 @@ def plot_trade_timeline(data, portfolio):
 
 def main():
     data = load_ohlc_csv(
-        filepath="data/XAUUSD.csv",
-        time_format="%Y-%m-%d %H:%M:%S",
+        filepath="../data/XAUUSD_PERIOD_15_SHORT.csv",
+        time_format="%Y.%m.%d %H:%M:%S",
     )
 
     portfolio = Portfolio(initial_cash=10_000)

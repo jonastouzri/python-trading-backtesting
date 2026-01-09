@@ -48,7 +48,7 @@ def plot_dashboard(data, portfolio: Portfolio):
 
 
 def main():
-    csv_path = "../data/XAUUSD_PERIOD_15.csv"
+    csv_path = "../data/XAUUSD_PERIOD_15_SHORT.csv"
     data = load_ohlc_csv(filepath=csv_path, time_format="%Y.%m.%d %H:%M:%S")
 
     portfolio = Portfolio(initial_cash=10_000)
