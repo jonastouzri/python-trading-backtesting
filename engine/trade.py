@@ -10,3 +10,14 @@ class Trade:
     @property
     def is_closed(self):
         return self.exit_price is not None
+
+    @property
+    def profit(self):
+        """
+        Gewinn / Verlust des Trades
+        Offene Trades = 0
+        """
+        if self.is_closed:
+            return self.exit_price - self.entry_price
+        else:
+            return 0

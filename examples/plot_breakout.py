@@ -16,25 +16,19 @@ def plot_dashboard(data, portfolio):
     ax_price.plot(prices, label="Price")
 
     for trade in portfolio.trades:
-        # Entry/Exit vertikale Linien
         ax_price.axvline(trade.entry_index, color="blue", linestyle="--", alpha=0.7)
-        ax_price.axvline(trade.exit_index, color="black", linestyle="--", alpha=0.7)
 
-        # SL/TP horizontale Linien
-        ax_price.hlines(
-            trade.sl,
-            trade.entry_index,
-            trade.exit_index,
-            colors="red",
-            linestyles="dotted",
-        )
-        ax_price.hlines(
-            trade.tp,
-            trade.entry_index,
-            trade.exit_index,
-            colors="green",
-            linestyles="dotted",
-        )
+        if trade.is_closed:
+            if trade.exit_price >= trade.tp:
+                color_exit = "green"
+            elif trade.exit_price <= trade.sl:
+                color_exit = "red"
+            else:
+                color_exit = "gray"
+
+            ax_price.axvline(trade.exit_index, color=color_exit, linestyle="--", alpha=0.7)
+            ax_price.hlines(trade.sl, trade.entry_index, trade.exit_index, colors="red", linestyles="dotted")
+            ax_price.hlines(trade.tp, trade.entry_index, trade.exit_index, colors="green", linestyles="dotted")
 
     ax_price.set_title("Price & Trades (Breakout Strategy)")
     ax_price.legend()
@@ -44,9 +38,8 @@ def plot_dashboard(data, portfolio):
     ax_equity.set_title("Equity Curve")
     ax_equity.legend()
 
-    # -------- METRICS --------
+    # -------- PERFORMANCE METRICS --------
     metrics = compute_performance_metrics(portfolio.trades, portfolio.equity_curve)
-
     text = (
         f"Trades: {metrics['trades']}\n"
         f"Winrate: {metrics['winrate']:.1f} %\n"
@@ -78,7 +71,7 @@ def main():
     )
 
     portfolio = Portfolio()
-    strategy = BreakoutStrategy(lookback=20)
+    strategy = BreakoutStrategy(lookback=20, sl_lookback=5, risk_reward=1.0)
     engine = BacktestEngine(data, portfolio, strategy)
     engine.run()
 

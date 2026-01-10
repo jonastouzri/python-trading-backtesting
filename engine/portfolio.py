@@ -1,46 +1,42 @@
-class Trade:
-    def __init__(self, entry_price, entry_index, sl, tp):
-        self.entry_price = entry_price
-        self.entry_index = entry_index
-        self.sl = sl
-        self.tp = tp
-
-        self.exit_price = None
-        self.exit_index = None
-        self.exit_type = None
-        self.profit = None
+from engine.trade import Trade
 
 
 class Portfolio:
-    def __init__(self, initial_balance=0.0):
-        self.initial_balance = initial_balance
-        self.balance = initial_balance
-
-        self.position_open = False
-        self.current_trade = None
+    def __init__(self):
         self.trades = []
-
-        self.equity_curve = [initial_balance]
-
-    def open_position(self, price, index, sl, tp):
-        if self.position_open:
-            return
-
-        self.current_trade = Trade(price, index, sl, tp)
-        self.position_open = True
-
-    def close_position(self, price, index, exit_type):
-        trade = self.current_trade
-        trade.exit_price = price
-        trade.exit_index = index
-        trade.exit_type = exit_type
-        trade.profit = price - trade.entry_price
-
-        self.balance += trade.profit
-        self.trades.append(trade)
-
         self.current_trade = None
-        self.position_open = False
+        self.equity_curve = []
+
+    def open_trade(self, price, index, sl, tp):
+        """
+        Öffnet einen neuen Trade mit SL/TP
+        """
+        self.current_trade = Trade(
+            entry_price=price,
+            entry_index=index,
+            sl=sl,
+            tp=tp
+        )
+        self.trades.append(self.current_trade)
+
+    def close_trade(self, price, index):
+        """
+        Schließt aktuellen Trade
+        """
+        if self.current_trade is not None:
+            self.current_trade.exit_price = price
+            self.current_trade.exit_index = index
+            self.current_trade = None
 
     def update_equity(self):
-        self.equity_curve.append(self.balance)
+        """
+        Equity Curve aktualisieren:
+        - Nur abgeschlossene Trades werden berücksichtigt
+        - Offene Trades beeinflussen die Equity nicht
+        """
+        if not self.trades:
+            equity = 0
+        else:
+            equity = sum([t.profit for t in self.trades if t.is_closed])
+
+        self.equity_curve.append(equity)
