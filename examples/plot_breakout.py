@@ -73,7 +73,7 @@ def plot_dashboard(data, portfolio):
 
 def main():
     data = load_csv(
-        "../data/XAUUSD_PERIOD_15_SHORT.csv",
+        "data/XAUUSD_PERIOD_15_SHORT.csv",
         datetime_format="%Y.%m.%d %H:%M:%S",
     )
 
