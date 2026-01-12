@@ -3,93 +3,132 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # =========================
-# Config
+# Konfiguration
 # =========================
 CSV_PATH = "data/XAUUSD_PERIOD_05.csv"
-WINDOW = 30  # N Kerzen Rückblick
+WINDOW = 100  # Anzahl Kerzen
+START_INDEX = 200  # Startpunkt im Chart
 
 # =========================
-# Load data
+# Daten laden
 # =========================
-df = pd.read_csv(CSV_PATH, sep="\t")
-df.reset_index(drop=True, inplace=True)
-print(df.columns)
-# Kerze 1 = letzte geschlossene Kerze
-current_idx = WINDOW + 1
+df = pd.read_csv(
+    CSV_PATH,
+    sep="\t",
+    names=["time", "high", "low", "open", "close"],
+    header=0
+)
+
+df["close"] = df["close"].astype(float)
+
+index = START_INDEX
 
 # =========================
-# Trendline (simple linear regression on close)
+# Regression
 # =========================
-def compute_trendline(closes):
-    x = np.arange(len(closes))
-    y = np.array(closes)
+def regression_line(y):
+    x = np.arange(len(y))
+    m, b = np.polyfit(x, y, 1)
+    return m, b, m * x + b
 
-    if len(x) < 2:
-        return None
+# =========================
+# High / Low relativ zur Regression
+# =========================
+def find_extrema_against_regression(closes, reg):
+    extrema = []
 
-    slope, intercept = np.polyfit(x, y, 1)
-    trend = slope * x + intercept
-    return trend, slope
+    def side(i):
+        return np.sign(closes[i] - reg[i])
 
+    n = len(closes)
+    current_side = side(0)
+
+    max_dist = abs(closes[0] - reg[0])
+    max_idx = 0
+
+    for i in range(1, n):
+        s = side(i)
+        dist = abs(closes[i] - reg[i])
+
+        # gleicher Bereich
+        if s == current_side or s == 0:
+            if dist > max_dist:
+                max_dist = dist
+                max_idx = i
+
+        # Seitenwechsel
+        else:
+            extrema.append((
+                max_idx,
+                closes[max_idx],
+                "high" if current_side > 0 else "low"
+            ))
+
+            current_side = s
+            max_dist = dist
+            max_idx = i
+
+    # letzten Abschnitt speichern
+    extrema.append((
+        max_idx,
+        closes[max_idx],
+        "high" if current_side > 0 else "low"
+    ))
+
+    return extrema
 
 # =========================
 # Plot
 # =========================
-fig, ax = plt.subplots(figsize=(12, 6))
+fig, ax = plt.subplots(figsize=(14, 6))
 
 def redraw():
     ax.clear()
 
-    start = current_idx - WINDOW
-    end = current_idx
-
-    window = df.iloc[start:end]
-
+    window = df.iloc[index - WINDOW:index]
     closes = window["close"].values
-    x = np.arange(len(window))
 
-    # --- Price ---
-    ax.plot(x, closes, label="Close", color="black")
+    x = np.arange(len(closes))
+    m, b, reg = regression_line(closes)
 
-    # --- Trendline ---
-    result = compute_trendline(closes)
-    if result:
-        trend, slope = result
-        ax.plot(x, trend, linestyle="--", label=f"Trend (slope={slope:.4f})")
+    extrema = find_extrema_against_regression(closes, reg)
+
+    # Close Preise
+    ax.plot(x, closes, color="black", linewidth=1)
+
+    # Regression
+    ax.plot(x, reg, linestyle="--", color="gray", linewidth=1)
+
+    # Highs / Lows
+    for i, price, kind in extrema:
+        if kind == "high":
+            ax.scatter(i, price, color="blue", s=60, zorder=5)
+        else:
+            ax.scatter(i, price, color="red", s=60, zorder=5)
 
     ax.set_title(
-        f"Trend Replay | Candle index = {current_idx} | "
-        f"Time = {df.iloc[current_idx]['time']}"
+        f"Index {index} | slope={m:.4f}",
+        fontsize=12
     )
-    ax.legend()
+
     ax.grid(True)
-
-    fig.canvas.draw_idle()
-
+    plt.draw()
 
 # =========================
-# Keyboard handler
+# Key Events
 # =========================
 def on_key(event):
-    global current_idx
-
-    if event.key in ["n", "right"]:
-        if current_idx < len(df) - 1:
-            current_idx += 1
-            redraw()
-
-    elif event.key in ["b", "left"]:
-        if current_idx > WINDOW + 1:
-            current_idx -= 1
-            redraw()
-
+    global index
+    if event.key == "right":
+        index += 1
+        redraw()
+    elif event.key == "left":
+        index -= 1
+        redraw()
     elif event.key == "q":
-        plt.close(fig)
+        plt.close()
 
-
-# =========================
-# Init
-# =========================
 fig.canvas.mpl_connect("key_press_event", on_key)
+
 redraw()
 plt.show()
