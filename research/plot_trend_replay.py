@@ -2,133 +2,127 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-# =========================
-# Konfiguration
-# =========================
-CSV_PATH = "data/XAUUSD_PERIOD_05.csv"
-WINDOW = 100  # Anzahl Kerzen
-START_INDEX = 200  # Startpunkt im Chart
-
-# =========================
-# Daten laden
-# =========================
+# --------------------------
+# CSV laden
+# --------------------------
 df = pd.read_csv(
-    CSV_PATH,
+    "data/XAUUSD_PERIOD_05.csv",
     sep="\t",
-    names=["time", "high", "low", "open", "close"],
-    header=0
+    dtype={"open": float, "high": float, "low": float, "close": float}
 )
+df = df.dropna(subset=["open", "high", "low", "close"])
+df.reset_index(inplace=True)
+df.rename(columns={"index": "candle_index"}, inplace=True)
 
-df["close"] = df["close"].astype(float)
-
-index = START_INDEX
-
-# =========================
+# --------------------------
 # Regression
-# =========================
+# --------------------------
 def regression_line(y):
     x = np.arange(len(y))
     m, b = np.polyfit(x, y, 1)
-    return m, b, m * x + b
+    return m, b
 
-# =========================
-# High / Low relativ zur Regression
-# =========================
-def find_extrema_against_regression(closes, reg):
-    extrema = []
+# --------------------------
+# Extrempunkte pro Segment
+# --------------------------
+def find_extreme_points(y, m, b):
+    """
+    Für jedes Segment zwischen zwei Kreuzungen der Regressionslinie
+    wird GENAU EIN Punkt markiert:
+      oberhalb -> High (max. Distanz)
+      unterhalb -> Low  (min. Distanz)
+    """
+    x = np.arange(len(y))
+    line = m * x + b
+    dist = y - line
 
-    def side(i):
-        return np.sign(closes[i] - reg[i])
+    extremes = []
 
-    n = len(closes)
-    current_side = side(0)
+    segment_start = 0
+    current_sign = np.sign(dist[0])
 
-    max_dist = abs(closes[0] - reg[0])
-    max_idx = 0
+    for i in range(1, len(y)):
+        if np.sign(dist[i]) != current_sign and np.sign(dist[i]) != 0:
+            # Segment abgeschlossen → Extrempunkt bestimmen
+            segment = dist[segment_start:i]
 
-    for i in range(1, n):
-        s = side(i)
-        dist = abs(closes[i] - reg[i])
+            if current_sign > 0:
+                rel_idx = np.argmax(segment)
+                typ = "high"
+            else:
+                rel_idx = np.argmin(segment)
+                typ = "low"
 
-        # gleicher Bereich
-        if s == current_side or s == 0:
-            if dist > max_dist:
-                max_dist = dist
-                max_idx = i
+            idx = segment_start + rel_idx
+            extremes.append((idx, y[idx], typ))
 
-        # Seitenwechsel
+            # Neues Segment
+            segment_start = i
+            current_sign = np.sign(dist[i])
+
+    # Letztes Segment auswerten
+    if segment_start < len(y) - 1:
+        segment = dist[segment_start:]
+        if current_sign > 0:
+            rel_idx = np.argmax(segment)
+            typ = "high"
         else:
-            extrema.append((
-                max_idx,
-                closes[max_idx],
-                "high" if current_side > 0 else "low"
-            ))
+            rel_idx = np.argmin(segment)
+            typ = "low"
 
-            current_side = s
-            max_dist = dist
-            max_idx = i
+        idx = segment_start + rel_idx
+        extremes.append((idx, y[idx], typ))
 
-    # letzten Abschnitt speichern
-    extrema.append((
-        max_idx,
-        closes[max_idx],
-        "high" if current_side > 0 else "low"
-    ))
+    return extremes
 
-    return extrema
+# --------------------------
+# Interaktiver Plot
+# --------------------------
+current_step = 5
 
-# =========================
-# Plot
-# =========================
-fig, ax = plt.subplots(figsize=(14, 6))
+fig, ax = plt.subplots()
+plt.ion()
 
 def redraw():
     ax.clear()
 
-    window = df.iloc[index - WINDOW:index]
-    closes = window["close"].values
+    closes = df["close"].values[:current_step]
+    x = df["candle_index"].values[:current_step]
 
-    x = np.arange(len(closes))
-    m, b, reg = regression_line(closes)
+    if len(closes) < 3:
+        return
 
-    extrema = find_extrema_against_regression(closes, reg)
+    m, b = regression_line(closes)
+    reg_line = m * np.arange(len(closes)) + b
 
-    # Close Preise
-    ax.plot(x, closes, color="black", linewidth=1)
+    # Plot
+    ax.plot(x, closes, color="black", label="Close")
+    ax.plot(x, reg_line, linestyle="--", color="gray", label="Regression")
 
-    # Regression
-    ax.plot(x, reg, linestyle="--", color="gray", linewidth=1)
+    extremes = find_extreme_points(closes, m, b)
+    for idx, val, typ in extremes:
+        ax.scatter(
+            x[idx], val,
+            color="blue" if typ == "high" else "red",
+            s=60, zorder=5
+        )
 
-    # Highs / Lows
-    for i, price, kind in extrema:
-        if kind == "high":
-            ax.scatter(i, price, color="blue", s=60, zorder=5)
-        else:
-            ax.scatter(i, price, color="red", s=60, zorder=5)
-
-    ax.set_title(
-        f"Index {index} | slope={m:.4f}",
-        fontsize=12
-    )
-
-    ax.grid(True)
+    ax.set_title(f"Step {current_step}/{len(df)}")
+    ax.legend()
     plt.draw()
 
-# =========================
-# Key Events
-# =========================
 def on_key(event):
-    global index
-    if event.key == "right":
-        index += 1
-        redraw()
-    elif event.key == "left":
-        index -= 1
-        redraw()
-    elif event.key == "q":
+    global current_step
+    if event.key == "q":
         plt.close()
+    else:
+        current_step += 1
+        if current_step >= len(df):
+            print("End of data")
+            plt.close()
+        else:
+            redraw()
 
 fig.canvas.mpl_connect("key_press_event", on_key)
-
 redraw()
-plt.show()
+plt.show(block=True)
