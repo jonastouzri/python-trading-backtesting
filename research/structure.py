@@ -55,16 +55,31 @@ def update_points(idx, price):
     global MAX0, MIN0, MAX1, MIN1
 
     if active(MIN1):
-        print("MIN0 = ", MIN0)
-        print("MIN1 = ", MIN1)
         if price < MIN0["p"]:
             print("hypothetical trend detected")
-            if MIN1["idx"] - MIN0["idx"] >= sensitivity:
+            if current_step - MIN0["idx"] <= sensitivity:
                 print("hypothetical trend too sensitive")
             else:
                 print("hypothetical trend is valid")
 
+    # MAX1
+    if active(MAX1):
+        if price > MAX1["p"]:
+            MAX1 = {"idx": idx, "p": price}
+            MIN1 = {"idx": -1, "p": -1}
+        elif price < MAX1["p"]:
+            MIN1 = {"idx": idx, "p": price}
 
+    # MIN0
+    if active(MIN0):
+        if price > MIN0["p"]:
+            if not active(MAX1):
+                MAX1 = {"idx": idx, "p": price}
+        elif price < MIN0["p"]:
+            MIN0 = {"idx": idx, "p": price}
+            MAX1 = {"idx": -1, "p": -1}
+            MIN1 = {"idx": -1, "p": -1}
+            print("QQQ")
 
     # MAX0
     if not active(MAX0):
@@ -80,23 +95,9 @@ def update_points(idx, price):
             MIN0 = {"idx": idx, "p": price}
             print("<")
 
-    # MIN0
-    if active(MIN0):
-        if price > MIN0["p"]:
-            if not active(MAX1):
-                MAX1 = {"idx": idx, "p": price}
-        elif price < MIN0["p"]:
-            MIN0 = {"idx": idx, "p": price}
-            MAX1 = {"idx": -1, "p": -1}
-            MIN1 = {"idx": -1, "p": -1}
 
-    # MAX1
-    if active(MAX1):
-        if price > MAX1["p"]:
-            MAX1 = {"idx": idx, "p": price}
-            MIN1 = {"idx": -1, "p": -1}
-        elif price < MAX1["p"]:
-            MIN1 = {"idx": idx, "p": price}
+
+
 
     print("+++++")
     print(MAX0)
