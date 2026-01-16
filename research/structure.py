@@ -134,25 +134,29 @@ def draw_line(idx, line_obj, line_plt):
     line_obj["idx"].append(idx)
     line_obj["p"].append(line_obj["m"] * idx + line_obj["b"])
     line_plt.set_data([line_obj["idx"]], [line_obj["p"]])
-    print(line_obj["p"])
+
 
 
 
 def redraw():
     global MAX0, MIN0, MAX1, MIN1
 
-    if current_step < SLIDING_START:
-        window_df = df.iloc[:current_step]
-    else:
-        window_df = df.iloc[current_step - WINDOW_SIZE: current_step]
+    # if current_step < SLIDING_START:
+    #     window_df = df.iloc[:current_step]
+    # else:
+    #     window_df = df.iloc[current_step - WINDOW_SIZE: current_step]
 
-    x = window_df["candle_index"].values
-    prices = window_df["close"].values
+    full_df = df.iloc[:current_step]
+    idx = full_df["candle_index"].values
+    prices = full_df["close"].values
 
-    # Preislinie
-    price_line.set_data(x, prices)
-    # X/Y Limits mit Padding
-    ax.set_xlim(x[0], x[-1] + RIGHT_PADDING)
+
+    price_line.set_data(idx, prices)
+    ax.set_xlim(
+        idx[-WINDOW_SIZE],
+        idx[-1] + RIGHT_PADDING
+    )
+
     # ax.set_ylim(prices.min() * 0.999, prices.max() * 1.001)
     ax.set_ylim(prices[-1] - 3, prices[-1] + 3)
 
