@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -11,15 +12,16 @@ df = pd.read_csv(
 )
 df = df.dropna(subset=["close"])
 df.reset_index(inplace=True)
-df.rename(columns={"index": "candle_index"}, inplace=True)
 
 # --------------------------
 # Parameter
 # --------------------------
-START_INDEX = 570
+START_INDEX = 1000500
 SLIDING_START = 100
-WINDOW_SIZE = 50
-RIGHT_PADDING = 5
+WINDOW_SIZE = 300
+RIGHT_PADDING = 50
+
+WINDOW_Y = 4
 
 current_step = START_INDEX
 sensitivity = 10
@@ -31,10 +33,15 @@ MIN0 = RESET
 MAX1 = RESET
 MIN1 = RESET
 
-line0 = {"idx": [], "p": [], "m": 0, "b": 0}
-line1 = {"idx": [], "p": [], "m": 0, "b": 0}
+trend_A = {"idx": [], "p": [], "m": 0, "b": 0, "idx_min1": 0}
+trend_B = {"idx": [], "p": [], "m": 0, "b": 0, "idx_min1": 0}
+trend_C = {"idx": [], "p": [], "m": 0, "b": 0, "idx_min1": 0}
 
-fig, ax = plt.subplots()
+valid_A = []
+valid_B = []
+valid_C = []
+
+fig, ax = plt.subplots(figsize=(10, 8))
 plt.ion()
 price_line, = ax.plot([], [], color="black", linewidth=1)
 
@@ -43,12 +50,13 @@ min0_point, = ax.plot([], [], "bo", markersize=10, alpha=0.4)
 max1_point, = ax.plot([], [], "ro", markersize=7, alpha=0.4)
 min1_point, = ax.plot([], [], "bo", markersize=7, alpha=0.4)
 
-plt0_line, = ax.plot([], [], "--", color="gray", linewidth=1, markersize=10, alpha=0.6)
-plt1_line, = ax.plot([], [], "-", color="green", linewidth=1, markersize=10, alpha=0.6)
+plt_trend_A, = ax.plot([], [], "--", color="gray", linewidth=1, markersize=10, alpha=0.6)
+plt_trend_B, = ax.plot([], [], "--", color="gray", linewidth=1, markersize=10, alpha=0.6)
+plt_trend_C, = ax.plot([], [], "--", color="gray", linewidth=1, markersize=10, alpha=0.6)
 
 
-def compute_line():
-    global MAX0, MAX1
+def compute_trend():
+    global MAX0, MAX1, MIN0, MIN1
     m = (MAX0["p"] - MAX1["p"]) / (MAX0["idx"] - MAX1["idx"])
     b = MAX0["p"] - m * MAX0["idx"]
 
@@ -56,38 +64,85 @@ def compute_line():
         "idx": [MAX0["idx"], MAX1["idx"]],
         "p": [MAX0["p"], MAX1["p"]],
         "m": m,
-        "b": b
+        "b": b,
+        "idx_min1": MIN1["idx"] + 1
     }
 
+def update_trend(indices, prices, trend):
+    # check if a spike above the trend line appeared, but lower than the max1 price
+    # this must be checked after the trend has been confirmed
 
+    if not trend_active(trend):
+        return
+
+    idx0 = trend["idx"][0]
+    idx1 = trend["idx"][1]
+    idx2 = trend["idx_min1"]
+    section_trend = trend["m"] * indices[idx1: idx2] + trend["b"]
+    section_prices = prices[idx1: idx2]
+
+    delta = section_prices - section_trend
+    max_point_idx = np.argmax(delta)
+    max_point = delta[max_point_idx]
+
+    prices = np.array(section_prices)
+    trend = np.array(section_trend)
+
+    mask = prices > trend
+
+    max_idx = None
+    max_price = None
+    if np.any(mask):
+        max_idx = np.argmax(prices * mask)
+        max_price = prices[max_idx]
+
+    print(idx1 + max_idx)
+    print(max_price)
+
+
+
+
+"""
+function to check if 
+"""
+
+
+def check_lines():
+    global trend_A, trend_B, trend_C
 
 
 def active(point):
     return point["idx"] != -1
 
 
-def line_active(line):
-    return len(line["idx"]) > 0
+def trend_active(trend):
+    return len(trend["idx"]) > 0
 
 
-def update_points(idx, price):
+def spot_trend(idx, price):
     global MAX0, MIN0, MAX1, MIN1
-    global line0, line1
+    global trend_A, trend_B
 
     if active(MIN1):
         if price < MIN0["p"]:
             if current_step - MIN0["idx"] > sensitivity:
                 print("Trend confirmed")
 
-                if not line_active(line0):
-                    line0 = compute_line()
-                elif not line_active(line1):
-                    line1 = compute_line()
+                if not trend_active(trend_A):
+                    trend_A = compute_trend()
+                elif not trend_active(trend_B):
+                    trend_B = compute_trend()
 
-                MAX0 = RESET
+                print(MAX0)
+                print(MIN0)
+                print(MAX1)
+                print(MIN1)
+
+                MAX0 = MAX1
                 MIN0 = RESET
                 MAX1 = RESET
                 MIN1 = RESET
+                print("reset points")
 
     # MAX1
     if active(MAX1):
@@ -127,53 +182,70 @@ def draw_point(point, pp):
         pp.set_data([], [])
 
 
-def draw_line(idx, line_obj, line_plt):
-    if not line_active(line_obj):
+def draw_line(idx, price, line_obj, line_plt):
+    if not trend_active(line_obj):
         return
 
+
+
+    trend_value = line_obj["m"] * idx + line_obj["b"]
+
+    # todo chck when a trend is not valid anymore
+    if price > trend_value:
+        valid_A.append(True)
+
+
     line_obj["idx"].append(idx)
-    line_obj["p"].append(line_obj["m"] * idx + line_obj["b"])
+    line_obj["p"].append(trend_value)
     line_plt.set_data([line_obj["idx"]], [line_obj["p"]])
 
 
+def delete_line(line_plt):
+    line_plt.set_data([], [])
 
 
-def redraw():
-    global MAX0, MIN0, MAX1, MIN1
+def set_axis(idx, prices):
 
-    # if current_step < SLIDING_START:
-    #     window_df = df.iloc[:current_step]
-    # else:
-    #     window_df = df.iloc[current_step - WINDOW_SIZE: current_step]
-
-    full_df = df.iloc[:current_step]
-    idx = full_df["candle_index"].values
-    prices = full_df["close"].values
-
-
-    price_line.set_data(idx, prices)
     ax.set_xlim(
         idx[-WINDOW_SIZE],
         idx[-1] + RIGHT_PADDING
     )
 
-    # ax.set_ylim(prices.min() * 0.999, prices.max() * 1.001)
-    ax.set_ylim(prices[-1] - 3, prices[-1] + 3)
+    # ax.set_ylim(prices[-1] - WINDOW_Y / 2, prices[-1] + WINDOW_Y / 2)
+    ax.set_ylim(prices[
+                current_step - WINDOW_SIZE: -1].min() * 0.999,
+                prices[current_step - WINDOW_SIZE: -1].max() * 1.001
+                )
 
-    # Running MAX ab Kerze 50
-    price = df["close"].iloc[current_step - 1]
+def redraw():
+    global MAX0, MIN0, MAX1, MIN1
+
+    full_df = df.iloc[:current_step]
+    indices = full_df["index"].values
+    prices = full_df["close"].values
+    times = full_df["time"].values
+
+    price_line.set_data(indices, prices)
+    set_axis(indices, prices)
+
     idx = current_step - 1
+    price = df["close"].iloc[current_step - 1]
 
-    update_points(idx, price)
+
+    spot_trend(idx, price)
+
+
     draw_point(MAX0, max0_point)
     draw_point(MIN0, min0_point)
     draw_point(MAX1, max1_point)
     draw_point(MIN1, min1_point)
 
-    draw_line(idx, line0, plt0_line)
-    draw_line(idx, line1, plt1_line)
+    draw_line(idx, price, trend_A, plt_trend_A)
+    draw_line(idx, price, trend_B, plt_trend_B)
 
-    ax.set_title(f"Running {START_INDEX} | Step {current_step}")
+    update_trend(indices, prices, trend_A)
+
+    ax.set_title(f"Running {START_INDEX} | Step {current_step} | Time {times[-1]}")
     fig.canvas.draw_idle()
 
 
@@ -201,7 +273,7 @@ fig.canvas.mpl_connect("key_press_event", on_key)
 # Warmup Plot
 # --------------------------
 warmup_df = df.iloc[START_INDEX - WINDOW_SIZE:START_INDEX]
-x = warmup_df["candle_index"].values
+x = warmup_df["index"].values
 y = warmup_df["close"].values
 
 price_line.set_data(x, y)
