@@ -33,13 +33,12 @@ MIN0 = RESET
 MAX1 = RESET
 MIN1 = RESET
 
-trend_A = {"idx": [], "p": [], "m": 0, "b": 0, "idx_min1": 0}
-trend_B = {"idx": [], "p": [], "m": 0, "b": 0, "idx_min1": 0}
-trend_C = {"idx": [], "p": [], "m": 0, "b": 0, "idx_min1": 0}
+TREND_OBJ_RESET = {"idx": [], "p": [], "m": 0, "b": 0, "idx_min1": 0}
+trend_A = TREND_OBJ_RESET
+trend_B = TREND_OBJ_RESET
+trend_C = TREND_OBJ_RESET
 
-valid_A = []
-valid_B = []
-valid_C = []
+
 
 fig, ax = plt.subplots(figsize=(10, 8))
 plt.ion()
@@ -67,6 +66,23 @@ def compute_trend():
         "b": b,
         "idx_min1": MIN1["idx"] + 1
     }
+
+
+def trend_invalid(prices, trend, n=5):
+    idx2 = trend["idx_min1"]
+    # start comparing price and trend values exactly after trend is being confirmed, this is at idx of MIN1
+    prices = np.asarray(prices[idx2:])
+    trend = np.asarray(trend["p"][2:])  # ignore idx2 of MAX0, MAX1
+
+    if len(prices) < n:
+        return False
+
+    print("prices  ", prices)
+    print("trend    ", trend)
+    print(np.all(prices[-n:] > trend[-n:]))
+
+    return np.all(prices[-n:] > trend[-n:])
+
 
 def update_trend(indices, prices, trend):
     # check if a spike above the trend line appeared, but lower than the max1 price
@@ -96,10 +112,8 @@ def update_trend(indices, prices, trend):
         max_idx = np.argmax(prices * mask)
         max_price = prices[max_idx]
 
-    print(idx1 + max_idx)
-    print(max_price)
-
-
+    # print(idx1 + max_idx)
+    # print(max_price)
 
 
 """
@@ -182,30 +196,22 @@ def draw_point(point, pp):
         pp.set_data([], [])
 
 
-def draw_line(idx, price, line_obj, line_plt):
-    if not trend_active(line_obj):
+def draw_trend(idx, price, trend_obj, trend_plt):
+    if not trend_active(trend_obj):
         return
 
+    next_trend_value = trend_obj["m"] * idx + trend_obj["b"]
+
+    trend_obj["idx"].append(idx)
+    trend_obj["p"].append(next_trend_value)
+    trend_plt.set_data([trend_obj["idx"]], [trend_obj["p"]])
 
 
-    trend_value = line_obj["m"] * idx + line_obj["b"]
-
-    # todo chck when a trend is not valid anymore
-    if price > trend_value:
-        valid_A.append(True)
-
-
-    line_obj["idx"].append(idx)
-    line_obj["p"].append(trend_value)
-    line_plt.set_data([line_obj["idx"]], [line_obj["p"]])
-
-
-def delete_line(line_plt):
-    line_plt.set_data([], [])
+def delete_trend(trend_plt):
+    trend_plt.set_data([], [])
 
 
 def set_axis(idx, prices):
-
     ax.set_xlim(
         idx[-WINDOW_SIZE],
         idx[-1] + RIGHT_PADDING
@@ -217,8 +223,10 @@ def set_axis(idx, prices):
                 prices[current_step - WINDOW_SIZE: -1].max() * 1.001
                 )
 
+
 def redraw():
     global MAX0, MIN0, MAX1, MIN1
+    global trend_A, trend_B, trend_C
 
     full_df = df.iloc[:current_step]
     indices = full_df["index"].values
@@ -231,19 +239,24 @@ def redraw():
     idx = current_step - 1
     price = df["close"].iloc[current_step - 1]
 
-
     spot_trend(idx, price)
-
 
     draw_point(MAX0, max0_point)
     draw_point(MIN0, min0_point)
     draw_point(MAX1, max1_point)
     draw_point(MIN1, min1_point)
 
-    draw_line(idx, price, trend_A, plt_trend_A)
-    draw_line(idx, price, trend_B, plt_trend_B)
+    draw_trend(idx, price, trend_A, plt_trend_A)
+    draw_trend(idx, price, trend_B, plt_trend_B)
 
-    update_trend(indices, prices, trend_A)
+    # update_trend(indices, prices, trend_A)
+
+    if trend_active(trend_A):
+        if trend_invalid(prices, trend_A):
+            delete_trend(plt_trend_A)
+            trend_A = TREND_OBJ_RESET
+            print("trend invalid")
+
 
     ax.set_title(f"Running {START_INDEX} | Step {current_step} | Time {times[-1]}")
     fig.canvas.draw_idle()
