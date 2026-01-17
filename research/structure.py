@@ -37,7 +37,8 @@ TREND_OBJ_RESET = {
     "idx": [],
     "p": [],
     "m": 0, "b": 0,
-    "idx_min1": 0
+    "idx_min1": 0,
+    "id": None
 }
 
 def set_trend_obj(name):
@@ -48,6 +49,9 @@ def set_trend_obj(name):
 trend_A = TREND_OBJ_RESET
 trend_B = TREND_OBJ_RESET
 trend_C = TREND_OBJ_RESET
+
+
+
 
 
 
@@ -66,7 +70,7 @@ plt_trend_B, = ax.plot([], [], "--", color="gray", linewidth=1, markersize=10, a
 plt_trend_C, = ax.plot([], [], "--", color="gray", linewidth=1, markersize=10, alpha=0.6)
 
 
-def compute_trend():
+def compute_trend(id):
     global MAX0, MAX1, MIN0, MIN1
     m = (MAX0["p"] - MAX1["p"]) / (MAX0["idx"] - MAX1["idx"])
     b = MAX0["p"] - m * MAX0["idx"]
@@ -76,7 +80,8 @@ def compute_trend():
         "p": [MAX0["p"], MAX1["p"]],
         "m": m,
         "b": b,
-        "idx_min1": MIN1["idx"] + 1
+        "idx_min1": MIN1["idx"] + 1,
+        "id": id
     }
 
 
@@ -143,24 +148,25 @@ def trend_active(trend):
     return len(trend["idx"]) > 0
 
 
-def spot_trend(idx, price):
+def spot_trend_structure(idx, price):
     global MAX0, MIN0, MAX1, MIN1
-    global trend_A, trend_B
+    global trend_A, trend_B, trend_C
 
     if active(MIN1):
         if price < MIN0["p"]:
             if current_step - MIN0["idx"] > sensitivity:
                 print("Trend confirmed")
 
+                # todo very ugly approach
                 if not trend_active(trend_A):
-                    trend_A = compute_trend()
+                    trend_A = compute_trend("trend_A")
+                    print("Created trend_A")
                 elif not trend_active(trend_B):
-                    trend_B = compute_trend()
-
-                print(MAX0)
-                print(MIN0)
-                print(MAX1)
-                print(MIN1)
+                    trend_B = compute_trend("trend_B")
+                    print("Created trend_B")
+                elif not trend_active(trend_C):
+                    trend_B = compute_trend("trend_C")
+                    print("Created trend_C")
 
                 MAX0 = MAX1
                 MIN0 = POINT_RESET
@@ -219,9 +225,10 @@ def draw_trend(idx, prices, trend_obj, trend_plt):
     # Remove trend after price broke through
     if trend_invalid(prices, trend_obj):
         delete_trend(trend_plt)
+        print("Deleted", trend_obj["id"])
         trend_obj.clear()
         trend_obj.update(TREND_OBJ_RESET)
-        print("trend invalid")
+
 
 
 
@@ -257,7 +264,7 @@ def redraw():
     idx = current_step - 1
     price = df["close"].iloc[current_step - 1]
 
-    spot_trend(idx, price)
+    spot_trend_structure(idx, price)
 
     draw_point(MAX0, max0_point)
     draw_point(MIN0, min0_point)
