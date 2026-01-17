@@ -24,16 +24,27 @@ RIGHT_PADDING = 50
 WINDOW_Y = 4
 
 current_step = START_INDEX
-sensitivity = 10
+sensitivity = 20
 
-RESET = {"idx": -1, "p": -1}
+POINT_RESET = {"idx": -1, "p": -1}
 
-MAX0 = RESET
-MIN0 = RESET
-MAX1 = RESET
-MIN1 = RESET
+MAX0 = POINT_RESET
+MIN0 = POINT_RESET
+MAX1 = POINT_RESET
+MIN1 = POINT_RESET
 
-TREND_OBJ_RESET = {"idx": [], "p": [], "m": 0, "b": 0, "idx_min1": 0}
+TREND_OBJ_RESET = {
+    "idx": [],
+    "p": [],
+    "m": 0, "b": 0,
+    "idx_min1": 0
+}
+
+def set_trend_obj(name):
+    return {"idx": [], "p": [], "m": 0, "b": 0, "idx_min1": 0}
+
+
+
 trend_A = TREND_OBJ_RESET
 trend_B = TREND_OBJ_RESET
 trend_C = TREND_OBJ_RESET
@@ -42,6 +53,7 @@ trend_C = TREND_OBJ_RESET
 
 fig, ax = plt.subplots(figsize=(10, 8))
 plt.ion()
+
 price_line, = ax.plot([], [], color="black", linewidth=1)
 
 max0_point, = ax.plot([], [], "ro", markersize=10, alpha=0.4)
@@ -70,16 +82,14 @@ def compute_trend():
 
 def trend_invalid(prices, trend, n=5):
     idx2 = trend["idx_min1"]
-    # start comparing price and trend values exactly after trend is being confirmed, this is at idx of MIN1
+    # start comparing price and trend values exactly
+    # after trend is being confirmed, this is at idx of MIN1
     prices = np.asarray(prices[idx2:])
     trend = np.asarray(trend["p"][2:])  # ignore idx2 of MAX0, MAX1
-
+    # print("prices  ", prices)
+    # print("trend    ", trend)
     if len(prices) < n:
         return False
-
-    print("prices  ", prices)
-    print("trend    ", trend)
-    print(np.all(prices[-n:] > trend[-n:]))
 
     return np.all(prices[-n:] > trend[-n:])
 
@@ -153,16 +163,16 @@ def spot_trend(idx, price):
                 print(MIN1)
 
                 MAX0 = MAX1
-                MIN0 = RESET
-                MAX1 = RESET
-                MIN1 = RESET
+                MIN0 = POINT_RESET
+                MAX1 = POINT_RESET
+                MIN1 = POINT_RESET
                 print("reset points")
 
     # MAX1
     if active(MAX1):
         if price > MAX1["p"]:
             MAX1 = {"idx": idx, "p": price}
-            MIN1 = RESET
+            MIN1 = POINT_RESET
         elif price < MAX1["p"]:
             MIN1 = {"idx": idx, "p": price}
 
@@ -173,17 +183,17 @@ def spot_trend(idx, price):
                 MAX1 = {"idx": idx, "p": price}
         elif price < MIN0["p"]:
             MIN0 = {"idx": idx, "p": price}
-            MAX1 = RESET
-            MIN1 = RESET
+            MAX1 = POINT_RESET
+            MIN1 = POINT_RESET
 
     # MAX0
     if not active(MAX0):
         MAX0 = {"idx": idx, "p": price}
     elif price >= MAX0["p"]:
         MAX0 = {"idx": idx, "p": price}
-        MIN0 = RESET
-        MAX1 = RESET
-        MIN1 = RESET
+        MIN0 = POINT_RESET
+        MAX1 = POINT_RESET
+        MIN1 = POINT_RESET
     elif price < MAX0["p"]:
         if not active(MIN0):
             MIN0 = {"idx": idx, "p": price}
@@ -196,7 +206,7 @@ def draw_point(point, pp):
         pp.set_data([], [])
 
 
-def draw_trend(idx, price, trend_obj, trend_plt):
+def draw_trend(idx, prices, trend_obj, trend_plt):
     if not trend_active(trend_obj):
         return
 
@@ -205,6 +215,14 @@ def draw_trend(idx, price, trend_obj, trend_plt):
     trend_obj["idx"].append(idx)
     trend_obj["p"].append(next_trend_value)
     trend_plt.set_data([trend_obj["idx"]], [trend_obj["p"]])
+
+    # Remove trend after price broke through
+    if trend_invalid(prices, trend_obj):
+        delete_trend(trend_plt)
+        trend_obj.clear()
+        trend_obj.update(TREND_OBJ_RESET)
+        print("trend invalid")
+
 
 
 def delete_trend(trend_plt):
@@ -246,16 +264,11 @@ def redraw():
     draw_point(MAX1, max1_point)
     draw_point(MIN1, min1_point)
 
-    draw_trend(idx, price, trend_A, plt_trend_A)
-    draw_trend(idx, price, trend_B, plt_trend_B)
+    draw_trend(idx, prices, trend_A, plt_trend_A)
+    draw_trend(idx, prices, trend_B, plt_trend_B)
 
     # update_trend(indices, prices, trend_A)
 
-    if trend_active(trend_A):
-        if trend_invalid(prices, trend_A):
-            delete_trend(plt_trend_A)
-            trend_A = TREND_OBJ_RESET
-            print("trend invalid")
 
 
     ax.set_title(f"Running {START_INDEX} | Step {current_step} | Time {times[-1]}")
