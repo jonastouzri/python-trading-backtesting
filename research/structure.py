@@ -16,7 +16,7 @@ df.reset_index(inplace=True)
 # --------------------------
 # Parameter
 # --------------------------
-START_INDEX = 1000500
+START_INDEX = 300000
 SLIDING_START = 100
 WINDOW_SIZE = 300
 RIGHT_PADDING = 50
@@ -24,7 +24,7 @@ RIGHT_PADDING = 50
 WINDOW_Y = 4
 
 current_step = START_INDEX
-sensitivity = 20
+DISTANCE = 20
 
 POINT_RESET = {"idx": -1, "p": -1}
 
@@ -41,19 +41,14 @@ TREND_OBJ_RESET = {
     "id": None
 }
 
+
 def set_trend_obj(name):
     return {"idx": [], "p": [], "m": 0, "b": 0, "idx_min1": 0}
-
 
 
 trend_A = TREND_OBJ_RESET
 trend_B = TREND_OBJ_RESET
 trend_C = TREND_OBJ_RESET
-
-
-
-
-
 
 fig, ax = plt.subplots(figsize=(10, 8))
 plt.ion()
@@ -70,7 +65,7 @@ plt_trend_B, = ax.plot([], [], "--", color="gray", linewidth=1, markersize=10, a
 plt_trend_C, = ax.plot([], [], "--", color="gray", linewidth=1, markersize=10, alpha=0.6)
 
 
-def compute_trend(id):
+def compute_trend_from_structure(id):
     global MAX0, MAX1, MIN0, MIN1
     m = (MAX0["p"] - MAX1["p"]) / (MAX0["idx"] - MAX1["idx"])
     b = MAX0["p"] - m * MAX0["idx"]
@@ -86,10 +81,12 @@ def compute_trend(id):
 
 
 def trend_invalid(prices, trend, n=5):
-    idx2 = trend["idx_min1"]
+    idx_min1 = trend["idx_min1"]
+    # if idx_min1 is None:
+    #     return False
     # start comparing price and trend values exactly
     # after trend is being confirmed, this is at idx of MIN1
-    prices = np.asarray(prices[idx2:])
+    prices = np.asarray(prices[idx_min1:])
     trend = np.asarray(trend["p"][2:])  # ignore idx2 of MAX0, MAX1
     # print("prices  ", prices)
     # print("trend    ", trend)
@@ -99,27 +96,28 @@ def trend_invalid(prices, trend, n=5):
     return np.all(prices[-n:] > trend[-n:])
 
 
-def update_trend(indices, prices, trend):
+def update_trend(indices, prices, trend_obj):
+    global MAX0
     # check if a spike above the trend line appeared, but lower than the max1 price
     # this must be checked after the trend has been confirmed
 
-    if not trend_active(trend):
+    if not trend_active(trend_obj):
         return
 
-    idx0 = trend["idx"][0]
-    idx1 = trend["idx"][1]
-    idx2 = trend["idx_min1"]
-    section_trend = trend["m"] * indices[idx1: idx2] + trend["b"]
-    section_prices = prices[idx1: idx2]
+    idx_min1 = trend_obj["idx_min1"]
+    if idx_min1 is None:
+        return
 
-    delta = section_prices - section_trend
-    max_point_idx = np.argmax(delta)
-    max_point = delta[max_point_idx]
+
+    idx0 = trend_obj["idx"][0]
+    idx1 = trend_obj["idx"][1]
+
+    section_trend = trend_obj["m"] * indices[idx1+1: idx_min1] + trend_obj["b"]
+    section_prices = prices[idx1+1: idx_min1]
 
     prices = np.array(section_prices)
     trend = np.array(section_trend)
-
-    mask = prices > trend
+    mask = prices >= trend
 
     max_idx = None
     max_price = None
@@ -127,13 +125,53 @@ def update_trend(indices, prices, trend):
         max_idx = np.argmax(prices * mask)
         max_price = prices[max_idx]
 
-    # print(idx1 + max_idx)
-    # print(max_price)
+    if max_idx is None:
+        return
+
+    ##############################
+
+    print("---------------")
+    # MAX0
+    p0_idx = trend_obj["idx"][0]
+    p0_price = trend_obj["p"][0]
+    print("P0")
+    print("p0_idx", p0_idx)
+    print("p0_price", p0_price)
 
 
-"""
-function to check if 
-"""
+    p1_idx = idx1 + max_idx + 1
+    p1_price = max_price
+    print("P1")
+    print("p1_idx", p1_idx)
+    print("p1_price", p1_price)
+
+
+    m = (p0_price - p1_price) / (p0_idx - p1_idx)
+    b = p0_price - m * p0_idx
+
+    id = trend_obj["id"]
+
+    trend_obj.clear()
+    trend_obj.update({
+        "idx": [p0_idx, p1_idx],
+        "p": [p0_price, p1_price],
+        "m": m,
+        "b": b,
+        "idx_min1": None,
+        "id": id
+    })
+
+    #MAX0 = {"idx": p1_idx, "p": p1_price}
+
+    MAX0 = {"idx": p1_idx, "p": p1_price}
+    MIN0 = POINT_RESET
+    MAX1 = POINT_RESET
+    MIN1 = POINT_RESET
+
+
+   # print("Updated", trend_obj["id"])
+   #hier gehts weiter
+
 
 
 def check_lines():
@@ -153,19 +191,19 @@ def spot_trend_structure(idx, price):
     global trend_A, trend_B, trend_C
 
     if active(MIN1):
-        if price < MIN0["p"]:
-            if current_step - MIN0["idx"] > sensitivity:
+        if price <= MIN0["p"]:
+            if current_step - MIN0["idx"] > DISTANCE:
                 print("Trend confirmed")
 
                 # todo very ugly approach
                 if not trend_active(trend_A):
-                    trend_A = compute_trend("trend_A")
+                    trend_A = compute_trend_from_structure("trend_A")
                     print("Created trend_A")
                 elif not trend_active(trend_B):
-                    trend_B = compute_trend("trend_B")
+                    trend_B = compute_trend_from_structure("trend_B")
                     print("Created trend_B")
                 elif not trend_active(trend_C):
-                    trend_B = compute_trend("trend_C")
+                    trend_B = compute_trend_from_structure("trend_C")
                     print("Created trend_C")
 
                 MAX0 = MAX1
@@ -176,7 +214,7 @@ def spot_trend_structure(idx, price):
 
     # MAX1
     if active(MAX1):
-        if price > MAX1["p"]:
+        if price >= MAX1["p"]:
             MAX1 = {"idx": idx, "p": price}
             MIN1 = POINT_RESET
         elif price < MAX1["p"]:
@@ -187,7 +225,7 @@ def spot_trend_structure(idx, price):
         if price > MIN0["p"]:
             if not active(MAX1):
                 MAX1 = {"idx": idx, "p": price}
-        elif price < MIN0["p"]:
+        elif price <= MIN0["p"]:
             MIN0 = {"idx": idx, "p": price}
             MAX1 = POINT_RESET
             MIN1 = POINT_RESET
@@ -230,8 +268,6 @@ def draw_trend(idx, prices, trend_obj, trend_plt):
         trend_obj.update(TREND_OBJ_RESET)
 
 
-
-
 def delete_trend(trend_plt):
     trend_plt.set_data([], [])
 
@@ -254,12 +290,12 @@ def redraw():
     global trend_A, trend_B, trend_C
 
     full_df = df.iloc[:current_step]
-    indices = full_df["index"].values
+    idxs = full_df["index"].values
     prices = full_df["close"].values
     times = full_df["time"].values
 
-    price_line.set_data(indices, prices)
-    set_axis(indices, prices)
+    price_line.set_data(idxs, prices)
+    set_axis(idxs, prices)
 
     idx = current_step - 1
     price = df["close"].iloc[current_step - 1]
@@ -271,12 +307,13 @@ def redraw():
     draw_point(MAX1, max1_point)
     draw_point(MIN1, min1_point)
 
+
+
     draw_trend(idx, prices, trend_A, plt_trend_A)
     draw_trend(idx, prices, trend_B, plt_trend_B)
 
-    # update_trend(indices, prices, trend_A)
-
-
+    #update_trend(idxs, prices, trend_A)
+    #
 
     ax.set_title(f"Running {START_INDEX} | Step {current_step} | Time {times[-1]}")
     fig.canvas.draw_idle()
