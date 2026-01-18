@@ -16,7 +16,7 @@ df.reset_index(inplace=True)
 # --------------------------
 # Parameter
 # --------------------------
-START_INDEX = 300000
+START_INDEX = 302050
 SLIDING_START = 100
 WINDOW_SIZE = 300
 RIGHT_PADDING = 50
@@ -50,7 +50,7 @@ trend_A = TREND_OBJ_RESET
 trend_B = TREND_OBJ_RESET
 trend_C = TREND_OBJ_RESET
 
-fig, ax = plt.subplots(figsize=(10, 8))
+fig, (ax, ax_macd) = plt.subplots(2, 1, figsize=(10, 8), sharex=True, gridspec_kw={"height_ratios": [1, 1]})
 plt.ion()
 
 price_line, = ax.plot([], [], color="black", linewidth=1)
@@ -64,6 +64,26 @@ plt_trend_A, = ax.plot([], [], "--", color="gray", linewidth=1, markersize=10, a
 plt_trend_B, = ax.plot([], [], "--", color="gray", linewidth=1, markersize=10, alpha=0.6)
 plt_trend_C, = ax.plot([], [], "--", color="gray", linewidth=1, markersize=10, alpha=0.6)
 
+
+
+# MACD lines
+macd_line, = ax_macd.plot([], [], color="blue", linewidth=1, label="MACD")
+signal_line, = ax_macd.plot([], [], color="orange", linewidth=1, label="Signal")
+hist_line, = ax_macd.plot([], [], color="gray", linewidth=1, alpha=0.5, label="Hist")
+
+ax_macd.axhline(0, color="black", linewidth=0.8)
+ax_macd.legend(loc="upper left")
+ax_macd.grid(True)
+
+
+def compute_macd(prices, fast=12, slow=26, signal=9):
+    prices = pd.Series(prices)
+    ema_fast = prices.ewm(span=fast, adjust=False).mean()
+    ema_slow = prices.ewm(span=slow, adjust=False).mean()
+    macd = ema_fast - ema_slow
+    signal_line = macd.ewm(span=signal, adjust=False).mean()
+    hist = macd - signal_line
+    return macd.values, signal_line.values, hist.values
 
 def compute_trend_from_structure(id):
     global MAX0, MAX1, MIN0, MIN1
@@ -307,10 +327,21 @@ def redraw():
     draw_point(MAX1, max1_point)
     draw_point(MIN1, min1_point)
 
-
-
     draw_trend(idx, prices, trend_A, plt_trend_A)
     draw_trend(idx, prices, trend_B, plt_trend_B)
+
+
+    # ---- MACD ----
+    macd, signal, hist = compute_macd(prices)
+    macd_line.set_data(idxs, macd)
+    signal_line.set_data(idxs, signal)
+    hist_line.set_data(idxs, hist)
+
+    ax_macd.set_xlim(idxs[-WINDOW_SIZE], idxs[-1] + RIGHT_PADDING)
+    ax_macd.set_ylim(
+        min(macd[-WINDOW_SIZE:]) * 1.1,
+        max(macd[-WINDOW_SIZE:]) * 1.1
+    )
 
     #update_trend(idxs, prices, trend_A)
     #
@@ -349,7 +380,13 @@ y = warmup_df["close"].values
 price_line.set_data(x, y)
 ax.set_xlim(x[0], x[-1] + RIGHT_PADDING)
 ax.set_ylim(y.min() * 0.999, y.max() * 1.001)
-# .set_yticks(y.min() * 0.999, y.max() * 1.001)
+
+
+macd, signal, hist = compute_macd(y)
+macd_line.set_data(x, macd[-len(x):])
+signal_line.set_data(x, signal[-len(x):])
+hist_line.set_data(x, hist[-len(x):])
+
 
 plt.grid(True)
 plt.show(block=True)
